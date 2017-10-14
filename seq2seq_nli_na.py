@@ -89,8 +89,9 @@ def attention_decoder(decoder_inputs, initial_state, attention_states, cell,
 def nli_embedding_attention_seq2seq(encoder_inputs, decoder_inputs,
                                     oov_prem_words, oov_hypo_words, cell,
                                     word_vectors, num_labels, dtype=tf.float32,
-                                    dropout_prob=0.0, scope=None,
-                                    initial_state_attention=False):
+                                    dropout=0.0, scope=None,
+                                    initial_state_attention=False,
+                                    forward_only=False):
   
   with tf.variable_scope(scope or "nli_embedding_attn_seq2seq"):
 
@@ -123,9 +124,10 @@ def nli_embedding_attention_seq2seq(encoder_inputs, decoder_inputs,
                       for i, inp in enumerate(decoder_inputs)]
 
     cell = tf.nn.rnn_cell.InputProjectionWrapper(cell, cell.output_size)
-    keep_prob = 1.0 - dropout_prob
-    cell = tf.nn.rnn_cell.DropoutWrapper(cell, input_keep_prob=keep_prob,
-                                         output_keep_prob=keep_prob)
+    if not forward_only:
+      keep_prob = 1.0 - dropout
+      cell = tf.nn.rnn_cell.DropoutWrapper(cell, input_keep_prob=keep_prob,
+                                           output_keep_prob=keep_prob)
     encoder_outputs, encoder_state = tf.nn.rnn(
         cell, encoder_inputs, dtype=dtype)
 
@@ -144,7 +146,7 @@ def nli_embedding_attention_seq2seq(encoder_inputs, decoder_inputs,
 def model_with_buckets(encoder_inputs, decoder_inputs, targets, weights,
                        oov_prem_words, oov_hypo_words,
                        buckets, seq2seq, softmax_loss_function=None,
-                       l2_reg_strength=0.0, name=None):
+                       l2_reg_strength=0.0, name=None, reuse_=False):
   if len(encoder_inputs) < buckets[-1][0]:
     raise ValueError("Length of encoder_inputs (%d) must be at least that of la"
                      "st bucket (%d)." % (len(encoder_inputs), buckets[-1][0]))
@@ -165,7 +167,7 @@ def model_with_buckets(encoder_inputs, decoder_inputs, targets, weights,
   with tf.name_scope(name, "model_with_buckets", all_inputs):
     for j, bucket in enumerate(buckets):
       with tf.variable_scope(tf.get_variable_scope(),
-                             reuse=True if j > 0 else None):
+                             reuse=True if reuse_ or j > 0 else None):
         bucket_outputs, _ = seq2seq(encoder_inputs[:bucket[0]],
                                     decoder_inputs[:bucket[1]],
                                     oov_prem_words[:bucket[0]],

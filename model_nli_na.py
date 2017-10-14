@@ -24,8 +24,8 @@ class NLI_NA_Seq2SeqModel(object):
 
   def __init__(self, oov_words_count, word_vectors, num_labels, buckets,
                size, num_layers, max_gradient_norm, batch_size,
-               learning_rate=1E-4, dropout=False, l2_reg_strength=False,
-               use_gru=False, forward_only=False):
+               learning_rate=1E-4, dropout=0.0, l2_reg_strength=False,
+               use_gru=False, forward_only=False, reuse=False):
     """Create the model.
 
     Args:
@@ -66,8 +66,8 @@ class NLI_NA_Seq2SeqModel(object):
     # The seq2seq function: we use embedding for the input, and attention.
     def seq2seq_f(prem_inputs, hypo_inputs, oov_prem_words, oov_hypo_words):
       return nli_embedding_attention_seq2seq(
-          prem_inputs, hypo_inputs, oov_prem_words, oov_hypo_words, cell,
-          word_vectors, num_labels, dropout_prob=dropout)
+        prem_inputs, hypo_inputs, oov_prem_words, oov_hypo_words, cell,
+        word_vectors, num_labels, dropout=dropout, forward_only=forward_only)
 
     # Feeds for inputs.
     self.prem_inputs = []
@@ -100,7 +100,8 @@ class NLI_NA_Seq2SeqModel(object):
     self.outputs, self.losses = model_with_buckets(
       self.prem_inputs, self.hypo_inputs, self.targets, self.target_weights,
       self.oov_prem_words, self.oov_hypo_words, buckets,
-      lambda w, x, y, z: seq2seq_f(w, x, y, z), l2_reg_strength=l2_reg_strength)
+      lambda w, x, y, z: seq2seq_f(w, x, y, z), l2_reg_strength=l2_reg_strength,
+      reuse_=reuse)
 
     
     # Gradients and SGD update operation for training the model.
@@ -146,7 +147,6 @@ class NLI_NA_Seq2SeqModel(object):
       input_feed[self.target_weights[l].name] = target_wts[l]
       input_feed[self.oov_hypo_words[l].name] = oov_hypo_words[l]
 
-    
     # Output feed: depends on whether we do a backward step or not.
     if not forward_only:
       output_feed = [self.updates[bucket_id],  # Update Op that does SGD.
@@ -157,7 +157,7 @@ class NLI_NA_Seq2SeqModel(object):
       for l in xrange(hypo_size):  # Output logits.
         output_feed.append(self.outputs[bucket_id][l])
 
-    if run_metadata == None:
+    if run_metadata is None:
       outputs = session.run(output_feed, input_feed)
     else:
       outputs = session.run(output_feed, input_feed,

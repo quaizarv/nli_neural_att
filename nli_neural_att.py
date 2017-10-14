@@ -13,15 +13,15 @@ class FLAGS():
   pass
 
 
-FLAGS.mode = 'train'   # or 'test'
-FLAGS.init_learning_rate = 1E-3
-FLAGS.dropout = 0.2
+FLAGS.mode = 'train'   # 'train' or 'test'
+FLAGS.init_learning_rate = 1E-4
+FLAGS.dropout = 0.3
 FLAGS.l2_reg_strength = 0.0
 FLAGS.batch_size = 64
 FLAGS.size = 100
 FLAGS.num_layers = 1
 FLAGS.max_gradient_norm = 50.0
-FLAGS.max_epochs
+FLAGS.max_epochs = 50
 FLAGS.data_dir = "/home/qv/nlp-data/SNLI/"
 FLAGS.train_dir = "/home/qv/nlp-data/nli-neural-att/"
 FLAGS.vec_dir = "/home/qv/nlp-data/pretrained-vectors/"
@@ -60,7 +60,7 @@ def bucketize_data(data):
   return data_set
 
 
-def create_model(session, forward_only, processed_data_dict):
+def create_model(session, forward_only, processed_data_dict, reuse=False):
   """Create translation model and initialize or load parameters in session."""
 
   i2v = processed_data_dict['i2v']
@@ -73,7 +73,7 @@ def create_model(session, forward_only, processed_data_dict):
     FLAGS.size, FLAGS.num_layers,
     FLAGS.max_gradient_norm, FLAGS.batch_size,
     FLAGS.init_learning_rate, FLAGS.dropout, FLAGS.l2_reg_strength,
-    forward_only=forward_only)
+    forward_only=forward_only, reuse=reuse)
 
   # Merge all the summaries and write them out to /tmp/train (by default)
   merged = tf.summary.merge_all()
@@ -155,13 +155,14 @@ def train():
     # Create model.
     print("Creating %d layers of %d units." % (FLAGS.num_layers, FLAGS.size))
     model = create_model(sess, False, processed_data_dict)
+    model2 = create_model(sess, True, processed_data_dict, reuse=True)
 
     # Read data into buckets and compute their sizes.
     dev_set = bucketize_data(processed_data_dict['dev_data'])
     train_set = bucketize_data(processed_data_dict['train_data'])
 
     # This is the training loop.
-    for epoch in range(50):
+    for epoch in range(500):
 
       print 'Epoch: ', epoch
       tokens = shuffle_data_and_generate_tokens(train_set)
@@ -175,7 +176,7 @@ def train():
         print("run-time %.2f cross-entropy loss %.2f" % (run_time, loss))
         i += 100
         dev_tokens = shuffle_data_and_generate_tokens(dev_set)
-        loss, acc, cps, n = run_batches(sess, model, dev_set, True,
+        loss, acc, cps, n = run_batches(sess, model2, dev_set, True,
                                         dev_tokens[:10])
         print("  eval: loss %.2f, accuracy %.2f,"
               " correct predictions %d, instances %d" %
@@ -191,7 +192,7 @@ def train():
       # Print statistics for the previous epoch.
       # print "epoch-time %.2f cross-entropy loss %.2f" % (epoch_time, loss)
       dev_tokens = shuffle_data_and_generate_tokens(dev_set)
-      loss, acc, cps, n = run_batches(sess, model, dev_set, True, dev_tokens)
+      loss, acc, cps, n = run_batches(sess, model2, dev_set, True, dev_tokens)
       print("  eval: loss %.2f, accuracy %.2f, correct predictions %d,"
             " instances %d" %
             (loss, acc, cps, n))
@@ -225,7 +226,6 @@ def test():
 
 
 if __name__ == "__main__":
-  initialize_parameters()
   if FLAGS.mode == 'test':
     test()
   else:

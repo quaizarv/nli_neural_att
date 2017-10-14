@@ -100,7 +100,7 @@ def word_vectors(vec_file, train_vocab_list):
     sl = sorted([(k, model.vocab[k].index, model.vocab[k].count)
                  for k in model.vocab.keys()],
                 key=lambda (k, idx, cnt): idx)
-    freq_words = set(zip(*sl[:50000])[0]) - set(train_vocab_list)
+    freq_words = set(zip(*sl[:500000])[0]) - set(train_vocab_list)
     selected_vocab = train_vocab_list + list(freq_words)
     w2v = {w: model[w] for w in selected_vocab
            if w in model.vocab}
